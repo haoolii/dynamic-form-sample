@@ -2,25 +2,28 @@
   <!-- 左側 Tabs -->
   <div class="tabs">
     <div class="tabs-header">
-      <h3>Teams</h3>
-      <!-- <button (click)="addTab()">＋</button> -->
+      <h3>Tabs</h3>
+      <!-- <button type="button" (click)="addTab('NEW_TAB')">＋</button> -->
+         <div class="tabs-header">
+          <label>
+            <input type="checkbox" [checked]="allEnabled()" (change)="allEnabled.set(!allEnabled()); toggleAllEnabled()" />
+            All Enabled
+          </label>
+          <button type="button" (click)="addTab('NEW_TAB')">＋</button>
+        </div>
     </div>
 
     @for (m of meta(); track $index) {
       <div
         class="tab-item"
-        [class.active]="activeIndex() ===  $index"
+        [class.active]="activeIndex() === $index"
         [class.disabled]="!m.enabled"
-        (click)="activeIndex.set( $index)"
+        (click)="activeIndex.set($index)"
       >
-        <span>{{ m.label }} ({{ ((formArray.at($index)?.get('users')))?.value?.length ?? 0 }})</span>
+        <span>{{ m.label }} ({{ formArray.at($index)?.get('children')?.value?.length ?? 0 }})</span>
         <div class="tab-status">
-          @if (m.edited) {
-            <span class="dot"></span>
-          }
-          @if (!m.enabled) {
-            <span class="disabled-mark">✖</span>
-          }
+          @if (m.edited) { <span class="dot"></span> }
+          @if (!m.enabled) { <span class="disabled-mark">✖</span> }
           <button (click)="removeTab($index); $event.stopPropagation()">🗑️</button>
         </div>
       </div>
@@ -30,23 +33,23 @@
   <!-- 右側表單 -->
   <div class="content" *ngIf="currentForm()">
     <form [formGroup]="currentForm()">
-      <label class="enabled-label">
+      <label>
         <input type="checkbox" formControlName="enabled" />
         Enabled
       </label>
 
-      <h4>Users</h4>
-      <div formArrayName="users">
-        @for (user of currentUsers.controls; track $index) {
-          <div class="user-item" [formGroupName]="$index">
-            <label>Name: <input type="text" formControlName="name" /></label>
-            <label>Email: <input type="email" formControlName="email" /></label>
-            <button type="button" (click)="removeUser($index)">－</button>
+      <h4>Conditions</h4>
+      <div formArrayName="children">
+        @for (child of currentChildren.controls; track $index) {
+          <div class="child-item" [formGroupName]="$index">
+            <input placeholder="field" formControlName="field" />
+            <input placeholder="operator" formControlName="operator" />
+            <input placeholder="value" formControlName="value" />
+            <button type="button" (click)="removeChild($index)">－</button>
           </div>
         }
       </div>
-
-      <button type="button" (click)="addUser()">＋ Add User</button>
+      <button type="button" (click)="addChild()">＋ Add Condition</button>
 
       <div class="actions">
         <button type="button" (click)="save(activeIndex())">💾 Save</button>
@@ -59,3 +62,7 @@
   <button (click)="submitAll()">Submit All</button>
   <button (click)="exit()">Exit</button>
 </div>
+
+<pre>
+  {{ formArray.value | json }}
+</pre>

@@ -8,6 +8,12 @@ interface TabMeta {
   enabled: boolean;
 }
 
+interface ChildCondition {
+  field: string;
+  operator: string;
+  value: any;
+}
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -18,64 +24,91 @@ interface TabMeta {
 export class AppComponent {
   private fb = new FormBuilder();
 
+  // 完整 tab 表單
   formArray = this.fb.array<FormGroup>([]);
   meta = signal<TabMeta[]>([]);
   activeIndex = signal(0);
 
-  private initialUsers: { name: string; email: string }[][] = [];
+  // 全域 enabled signal
+allEnabled = signal(true);
+
+
+  // 初始 config data
+  private configData: Record<string, { enabled: boolean; children: ChildCondition[] }> = {
+    "HELLO_WORKD": {
+      enabled: true,
+      children: [
+        { field: "usrename", operator: "EQ", value: "unn" },
+        { field: "age", operator: "EQ", value: 18 }
+      ]
+    },
+    "PLAY": {
+      enabled: true,
+      children: [
+        { field: "account", operator: "EQ", value: "unnhao" },
+        { field: "createAt", operator: "GT", value: 100 }
+      ]
+    }
+  };
+
+  // meta tab list
+  private tabList = ["HELLO_WORKD", "PLAY", "GAME", "HELP"];
+
+  // 儲存原始 children 用來判斷 edited
+  private initialChildren: ChildCondition[][] = [];
 
   constructor() {
-    const initialData = {
-      A: { enabled: false, data: [] },
-      B: { enabled: true, data: [
-        { name: 'Alice', email: 'alice@test.com' },
-        { name: 'Bob', email: 'bob@test.com' }
-      ]},
-      C: { enabled: false, data: [] }
-    };
-
-    Object.entries(initialData).forEach(([label, tab]) => {
-      this.addTab(label, tab.data);
+    this.tabList.forEach((label, idx) => {
+      const config = this.configData[label];
+      const children = config?.children ?? [];
+      this.addTab(label, children, config?.enabled ?? false);
     });
   }
 
-  private createUserGroup(name = '', email = '') {
-    return this.fb.group({ name: [name], email: [email] });
+  /** 建立 child form group */
+  private createChildGroup(child: ChildCondition) {
+    return this.fb.group({
+      field: [child.field],
+      operator: [child.operator],
+      value: [child.value]
+    });
   }
 
-  private createTabForm(users: { name: string; email: string }[], idx: number) {
+  /** 建立 tab form group */
+  private createTabForm(children: ChildCondition[], enabled: boolean, idx: number) {
     const form = this.fb.group({
-      enabled: [users.length > 0],
-      users: this.fb.array(users.map(u => this.createUserGroup(u.name, u.email)))
+      enabled: [children.length > 0 ? enabled : false],
+      children: this.fb.array(children.map(c => this.createChildGroup(c)))
     });
 
     form.valueChanges.subscribe(() => {
-      const usersArray = form.get('users') as FormArray<FormGroup>;
-      const currentUsers = usersArray.value as { name: string; email: string }[];
-      const hasUsers = currentUsers.length > 0;
+      const childrenArray = form.get('children') as FormArray<FormGroup>;
+      const currentChildren = childrenArray.value as ChildCondition[];
+      const hasChildren = currentChildren.length > 0;
 
-      form.get('enabled')?.setValue(hasUsers, { emitEvent: false });
+      form.get('enabled')?.setValue(hasChildren, { emitEvent: false });
 
-      const isEdited = JSON.stringify(currentUsers) !== JSON.stringify(this.initialUsers[idx]);
+      const isEdited = JSON.stringify(currentChildren) !== JSON.stringify(this.initialChildren[idx]);
       const currentMeta = [...this.meta()];
       currentMeta[idx].edited = isEdited;
-      currentMeta[idx].enabled = hasUsers;
+      currentMeta[idx].enabled = hasChildren;
       this.meta.set(currentMeta);
     });
 
     return form;
   }
 
-  addTab(label: string, users: { name: string; email: string }[] = []) {
+  /** 新增 tab */
+  addTab(label: string, children: ChildCondition[] = [], enabled = false) {
     const idx = this.formArray.length;
-    this.initialUsers[idx] = users.map(u => ({ ...u }));
+    this.initialChildren[idx] = children.map(c => ({ ...c }));
 
-    const form = this.createTabForm(users, idx);
+    const form = this.createTabForm(children, enabled, idx);
     this.formArray.push(form);
 
     this.meta.update(arr => [
       ...arr,
-      { label, edited: false, enabled: users.length > 0 }
+      { label, edited: false, enabled: children.length > 0 ? enabled : false }
     ]);
 
     this.activeIndex.set(this.formArray.length - 1);
@@ -83,7 +116,7 @@ export class AppComponent {
 
   removeTab(index: number) {
     this.formArray.removeAt(index);
-    this.initialUsers.splice(index, 1);
+    this.initialChildren.splice(index, 1);
     this.meta.update(arr => arr.filter((_, i) => i !== index));
     if (this.activeIndex() >= this.formArray.length) {
       this.activeIndex.set(this.formArray.length - 1);
@@ -91,24 +124,24 @@ export class AppComponent {
   }
 
   currentForm = computed(() => this.formArray.at(this.activeIndex()));
-  get currentUsers() {
+  get currentChildren() {
     const form = this.currentForm();
-    return form?.get('users') as FormArray<FormGroup>;
+    return form?.get('children') as FormArray<FormGroup>;
   }
 
-  addUser() {
-    this.currentUsers.push(this.createUserGroup());
+  addChild() {
+    this.currentChildren.push(this.createChildGroup({ field: '', operator: 'EQ', value: '' }));
   }
 
-  removeUser(index: number) {
-    this.currentUsers.removeAt(index);
+  removeChild(index: number) {
+    this.currentChildren.removeAt(index);
   }
 
   save(index: number) {
     const form = this.formArray.at(index);
     form.markAsPristine();
-    const usersArray = form.get('users') as FormArray<FormGroup>;
-    this.initialUsers[index] = usersArray.value.map(u => ({ ...u }));
+    const childrenArray = form.get('children') as FormArray<FormGroup>;
+    this.initialChildren[index] = childrenArray.value.map(c => ({ ...c }));
 
     this.meta.update(arr => {
       const copy = [...arr];
@@ -121,8 +154,8 @@ export class AppComponent {
   submitAll() {
     this.formArray.controls.forEach(ctrl => ctrl.markAsPristine());
     this.formArray.controls.forEach((ctrl, i) => {
-      const usersArray = ctrl.get('users') as FormArray<FormGroup>;
-      this.initialUsers[i] = usersArray.value.map(u => ({ ...u }));
+      const childrenArray = ctrl.get('children') as FormArray<FormGroup>;
+      this.initialChildren[i] = childrenArray.value.map(c => ({ ...c }));
     });
 
     this.meta.update(arr =>
@@ -136,6 +169,25 @@ export class AppComponent {
     alert('✅ All forms submitted!');
   }
 
+  // 監聽全域切換，更新每個 tab 的 enabled
+toggleAllEnabled() {
+  const enabled = this.allEnabled();
+  this.formArray.controls.forEach((form: FormGroup) => {
+    const usersArray = form.get('children') as FormArray<FormGroup>;
+    // 如果 tab 沒有 children 就保持 disabled
+    const hasChildren = usersArray.length > 0;
+    form.get('enabled')?.setValue(hasChildren ? enabled : false, { emitEvent: false });
+  });
+
+  // 更新 meta
+  this.meta.update(arr =>
+    arr.map((m, i) => ({
+      ...m,
+      enabled: (this.formArray.at(i).get('enabled')?.value ?? false)
+    }))
+  );
+}
+
   exit() {
     if (this.meta().some(m => m.edited)) {
       alert('⚠️ 尚有未儲存的變更！');
@@ -144,7 +196,6 @@ export class AppComponent {
     }
   }
 
-  // @for trackBy
   trackByIndex(_idx: number) {
     return _idx;
   }
