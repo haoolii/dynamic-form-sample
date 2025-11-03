@@ -1,0 +1,45 @@
+.app-container {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.sidebar {
+  width: 180px;
+  border-right: 1px solid #ccc;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab {
+  padding: 6px 10px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tab.active {
+  background: #eef;
+  font-weight: bold;
+}
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: blue;
+  margin-left: 4px;
+}
+.user-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.actions button {
+  margin-right: 8px;
+}
+.footer {
+  margin-top: 1rem;
+  text-align: center;
+}
