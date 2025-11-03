@@ -1,45 +1,87 @@
-.app-container {
+.container {
   display: flex;
-  gap: 1rem;
-  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
 }
 
-.sidebar {
-  width: 180px;
+.tabs {
+  width: 200px;
   border-right: 1px solid #ccc;
-  display: flex;
-  flex-direction: column;
+  padding-right: 8px;
 }
 
-.tab {
-  padding: 6px 10px;
-  cursor: pointer;
+.tabs-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 8px;
 }
-.tab.active {
-  background: #eef;
-  font-weight: bold;
-}
-.dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: blue;
-  margin-left: 4px;
-}
-.user-row {
+
+.tab-item {
   display: flex;
-  gap: 6px;
+  justify-content: space-between;
   align-items: center;
   margin-bottom: 4px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
 }
-.actions button {
-  margin-right: 8px;
+
+.tab-item.active {
+  background-color: #f0f0f0;
+  font-weight: bold;
 }
+
+.tab-item.disabled {
+  color: #888;
+}
+
+.tab-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  background: #007bff;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.disabled-mark {
+  font-size: 12px;
+  color: red;
+}
+
+.content {
+  flex: 1;
+  padding-left: 16px;
+}
+
+.enabled-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-item {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.actions {
+  margin-top: 16px;
+}
+
 .footer {
-  margin-top: 1rem;
-  text-align: center;
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
 }

@@ -1,63 +1,61 @@
-<div class="app-container">
-  <!-- 左側 tab -->
-  <div class="sidebar">
+<div class="container">
+  <!-- 左側 Tabs -->
+  <div class="tabs">
+    <div class="tabs-header">
+      <h3>Teams</h3>
+      <!-- <button (click)="addTab()">＋</button> -->
+    </div>
+
     @for (m of meta(); track $index) {
       <div
-        class="tab"
-        [class.active]="activeIndex() === $index"
-        (click)="activeIndex.set($index)"
+        class="tab-item"
+        [class.active]="activeIndex() ===  $index"
+        [class.disabled]="!m.enabled"
+        (click)="activeIndex.set( $index)"
       >
-        {{ m.label }}
-        <span class="status">
-          {{ m.enabled ? '✅' : '🚫' }}
-          <span *ngIf="m.edited" class="dot"></span>
-        </span>
+        <span>{{ m.label }} ({{ ((formArray.at($index)?.get('users')))?.value?.length ?? 0 }})</span>
+        <div class="tab-status">
+          @if (m.edited) {
+            <span class="dot"></span>
+          }
+          @if (!m.enabled) {
+            <span class="disabled-mark">✖</span>
+          }
+          <button (click)="removeTab($index); $event.stopPropagation()">🗑️</button>
+        </div>
       </div>
     }
-
-    <button (click)="addTab()">＋ 新增群組</button>
   </div>
 
-  <!-- 右側 form -->
-  <div class="content" *ngIf="currentForm() as form">
-    <form [formGroup]="form">
-      <div>
-        <label>啟用：</label>
+  <!-- 右側表單 -->
+  <div class="content" *ngIf="currentForm()">
+    <form [formGroup]="currentForm()">
+      <label class="enabled-label">
         <input type="checkbox" formControlName="enabled" />
-      </div>
+        Enabled
+      </label>
 
-      <hr />
-
+      <h4>Users</h4>
       <div formArrayName="users">
-        <h4>使用者列表</h4>
-        @for (u of currentUsers.controls; track $index) {
-          <div [formGroupName]="$index" class="user-row">
-            <input placeholder="Name" formControlName="name" />
-            <input placeholder="Email" formControlName="email" />
-            <button type="button" (click)="removeUser($index)">🗑</button>
+        @for (user of currentUsers.controls; track $index) {
+          <div class="user-item" [formGroupName]="$index">
+            <label>Name: <input type="text" formControlName="name" /></label>
+            <label>Email: <input type="email" formControlName="email" /></label>
+            <button type="button" (click)="removeUser($index)">－</button>
           </div>
         }
       </div>
 
-      <button type="button" (click)="addUser()">＋ 新增使用者</button>
-    </form>
+      <button type="button" (click)="addUser()">＋ Add User</button>
 
-    <div class="actions">
-      <button (click)="save(activeIndex())">💾 儲存</button>
-      <button (click)="removeTab(activeIndex())" [disabled]="formArray.length <= 1">
-        🗑 刪除群組
-      </button>
-    </div>
+      <div class="actions">
+        <button type="button" (click)="save(activeIndex())">💾 Save</button>
+      </div>
+    </form>
   </div>
 </div>
 
-<hr />
-
 <div class="footer">
-  <button (click)="submitAll()">📤 Submit All</button>
-  <button (click)="exit()">🚪 Exit</button>
+  <button (click)="submitAll()">Submit All</button>
+  <button (click)="exit()">Exit</button>
 </div>
-
-<pre>
-  {{ formArray.value | json }}
-</pre>
