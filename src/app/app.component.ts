@@ -60,7 +60,8 @@ export interface RootRuleForm {
   selector: 'app-root',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
-  template: `  <div class="rule-manager">
+  template: `
+    <div class="rule-manager">
       <!-- 左側: Type List -->
       <div class="sidebar">
         <h3>Rule Types</h3>
@@ -89,17 +90,17 @@ export interface RootRuleForm {
         <div class="sidebar-actions">
           <button
             class="btn-success btn-block"
-            [disabled]="!isFormDirty() || readonly()"
+            [disabled]="!isFormDirty()"
             (click)="saveAllRules()">
             💾 儲存全部
           </button>
           <button
             class="btn-secondary btn-block"
-            [disabled]="!isFormDirty() || readonly()"
+            [disabled]="!isFormDirty()"
             (click)="resetAllRules()">
             ↺ 重置全部
           </button>
-          <button
+           <button
             class="btn-primary btn-block"
             (click)="toggleReadonly()">
             {{ readonly() ? '解除唯讀' : '設定唯讀' }}
@@ -110,12 +111,26 @@ export interface RootRuleForm {
       <!-- 右側: Form -->
       <div class="content">
         @if (selectedType(); as type) {
+          <div class="form-header">
+            <h2>
+              {{ type }}
+              @if (isTypeDirty(type)) {
+                <span class="dirty-badge">已修改</span>
+              }
+            </h2>
+            @if (!hasRules(type)) {
+              <button class="btn-primary" (click)="createNewRule(type)" [disabled]="readonly()" >
+                + 新增第一筆規則
+              </button>
+            }
+          </div>
+
           @if (mainForm.controls[type]; as typeForm) {
             <div class="rule-form">
               <!-- Root Level Controls -->
               <div class="root-controls">
                 <label>
-                  <input type="checkbox" [formControl]="typeForm.controls.enabled" [disabled]="readonly()">
+                  <input type="checkbox" [formControl]="typeForm.controls.enabled">
                   啟用規則
                 </label>
                 <span class="operator-badge">{{ typeForm.controls.operator.value }}</span>
@@ -128,7 +143,7 @@ export interface RootRuleForm {
                     <div class="group-header">
                       <div class="group-controls">
                         <label>
-                          <input type="checkbox" [formControl]="orGroup.controls.enabled" [disabled]="readonly()">
+                          <input type="checkbox" [formControl]="orGroup.controls.enabled">
                           啟用群組 #{{ i + 1 }}
                         </label>
                         <span class="operator-badge or">OR</span>
@@ -136,8 +151,7 @@ export interface RootRuleForm {
                       <button
                         type="button"
                         class="btn-danger btn-sm"
-                        (click)="removeOrGroup(type, i)"
-                        [disabled]="readonly()">
+                        (click)="removeOrGroup(type, i)" [disabled]="readonly()">
                         刪除群組
                       </button>
                     </div>
@@ -147,10 +161,10 @@ export interface RootRuleForm {
                       @for (rule of getConditions(orGroup); track rule; let j = $index) {
                         <div class="rule-item">
                           <label class="checkbox">
-                            <input type="checkbox" [formControl]="rule.controls.enabled" [disabled]="readonly()">
+                            <input type="checkbox" [formControl]="rule.controls.enabled">
                           </label>
 
-                          <select [formControl]="rule.controls.field" class="field-select" [disabled]="readonly()">
+                          <select [formControl]="rule.controls.field" class="field-select">
                             <option value="">選擇欄位</option>
                             <option value="assigen">Assigen</option>
                             <option value="comment">Comment</option>
@@ -159,7 +173,7 @@ export interface RootRuleForm {
                             <option value="priority">Priority</option>
                           </select>
 
-                          <select [formControl]="rule.controls.operator" class="operator-select" [disabled]="readonly()">
+                          <select [formControl]="rule.controls.operator" class="operator-select">
                             <option value="EQ">等於 (=)</option>
                             <option value="!EQ">不等於 (≠)</option>
                             <option value="CTN">包含</option>
@@ -201,7 +215,7 @@ export interface RootRuleForm {
                 type="button"
                 class="btn-primary"
                 (click)="addOrGroup(type)"
-                [disabled]="readonly()">
+                 [disabled]="readonly()">
                 + 新增 OR 群組
               </button>
 
@@ -211,7 +225,7 @@ export interface RootRuleForm {
                   type="button"
                   class="btn-danger"
                   (click)="deleteRule(type)"
-                  [disabled]="readonly()">
+                   [disabled]="readonly()">
                   刪除此規則
                 </button>
               </div>
@@ -223,8 +237,13 @@ export interface RootRuleForm {
           </div>
         }
       </div>
-    </div>`,
-    styles: [`
+
+      <pre>
+        {{ mainForm.value | json }}
+      </pre>
+    </div>
+  `,
+  styles: [`
 
     .rule-manager {
       display: flex;
