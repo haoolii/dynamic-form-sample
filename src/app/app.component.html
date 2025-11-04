@@ -1,68 +1,168 @@
-<div class="container">
-  <!-- 左側 Tabs -->
-  <div class="tabs">
-    <div class="tabs-header">
-      <h3>Tabs</h3>
-      <!-- <button type="button" (click)="addTab('NEW_TAB')">＋</button> -->
-         <div class="tabs-header">
-          <label>
-            <input type="checkbox" [checked]="allEnabled()" (change)="allEnabled.set(!allEnabled()); toggleAllEnabled()" />
-            All Enabled
-          </label>
-          <button type="button" (click)="addTab('NEW_TAB')">＋</button>
-        </div>
-    </div>
+<div class="rule-manager">
+      <!-- 左側: Type List -->
+      <div class="sidebar">
+        <h3>Rule Types</h3>
+        <ul class="type-list">
+          @for (type of typeList(); track type) {
+            <li
+              [class.active]="selectedType() === type"
+              (click)="selectType(type)">
+              <span class="type-name">
+                @if (isTypeDirty(type)) {
+                  <span class="dirty-indicator"></span>
+                }
+                {{ type }}
+              </span>
+              @if (hasRules(type)) {
+                <span class="badge">{{ getRuleCount(type) }}</span>
+              }
+            </li>
+          }
+        </ul>
 
-    @for (m of meta(); track $index) {
-      <div
-        class="tab-item"
-        [class.active]="activeIndex() === $index"
-        [class.disabled]="!m.enabled"
-        (click)="activeIndex.set($index)"
-      >
-        <span>{{ m.label }} ({{ formArray.at($index)?.get('children')?.value?.length ?? 0 }})</span>
-        <div class="tab-status">
-          @if (m.edited) { <span class="dot"></span> }
-          @if (!m.enabled) { <span class="disabled-mark">✖</span> }
-          <button (click)="removeTab($index); $event.stopPropagation()">🗑️</button>
+        <!-- 全域操作按鈕 -->
+        <div class="sidebar-actions">
+          <button
+            class="btn-success btn-block"
+            [disabled]="!isFormDirty()"
+            (click)="saveAllRules()">
+            💾 儲存全部
+          </button>
+          <button
+            class="btn-secondary btn-block"
+            [disabled]="!isFormDirty()"
+            (click)="resetAllRules()">
+            ↺ 重置全部
+          </button>
         </div>
       </div>
-    }
-  </div>
 
-  <!-- 右側表單 -->
-  <div class="content" *ngIf="currentForm()">
-    <form [formGroup]="currentForm()">
-      <label>
-        <input type="checkbox" formControlName="enabled" />
-        Enabled
-      </label>
+      <!-- 右側: Form -->
+      <div class="content">
+        @if (selectedType(); as type) {
+          <div class="form-header">
+            <h2>
+              {{ type }}
+              @if (isTypeDirty(type)) {
+                <span class="dirty-badge">已修改</span>
+              }
+            </h2>
+            @if (!hasRules(type)) {
+              <button class="btn-primary" (click)="createNewRule(type)">
+                + 新增第一筆規則
+              </button>
+            }
+          </div>
 
-      <h4>Conditions</h4>
-      <div formArrayName="children">
-        @for (child of currentChildren.controls; track $index) {
-          <div class="child-item" [formGroupName]="$index">
-            <input placeholder="field" formControlName="field" />
-            <input placeholder="operator" formControlName="operator" />
-            <input placeholder="value" formControlName="value" />
-            <button type="button" (click)="removeChild($index)">－</button>
+          @if (mainForm.controls[type]; as typeForm) {
+            <div class="rule-form">
+              <!-- Root Level Controls -->
+              <div class="root-controls">
+                <label>
+                  <input type="checkbox" [formControl]="typeForm.controls.enabled">
+                  啟用規則
+                </label>
+                <span class="operator-badge">{{ typeForm.controls.operator.value }}</span>
+              </div>
+
+              <!-- AND Groups (FormArray) -->
+              <div class="and-groups">
+                @for (orGroup of getOrGroups(typeForm); track orGroup; let i = $index) {
+                  <div class="or-group-wrapper">
+                    <div class="group-header">
+                      <div class="group-controls">
+                        <label>
+                          <input type="checkbox" [formControl]="orGroup.controls.enabled">
+                          啟用群組 #{{ i + 1 }}
+                        </label>
+                        <span class="operator-badge or">OR</span>
+                      </div>
+                      <button
+                        type="button"
+                        class="btn-danger btn-sm"
+                        (click)="removeOrGroup(type, i)">
+                        刪除群組
+                      </button>
+                    </div>
+
+                    <!-- OR Group Rules -->
+                    <div class="rules-list">
+                      @for (rule of getConditions(orGroup); track rule; let j = $index) {
+                        <div class="rule-item">
+                          <label class="checkbox">
+                            <input type="checkbox" [formControl]="rule.controls.enabled">
+                          </label>
+
+                          <select [formControl]="rule.controls.field" class="field-select">
+                            <option value="">選擇欄位</option>
+                            <option value="assigen">Assigen</option>
+                            <option value="comment">Comment</option>
+                            <option value="user">User</option>
+                            <option value="status">Status</option>
+                            <option value="priority">Priority</option>
+                          </select>
+
+                          <select [formControl]="rule.controls.operator" class="operator-select">
+                            <option value="EQ">等於 (=)</option>
+                            <option value="!EQ">不等於 (≠)</option>
+                            <option value="CTN">包含</option>
+                            <option value="GT">大於 (>)</option>
+                            <option value="LT">小於 (<)</option>
+                          </select>
+
+                          <input
+                            type="text"
+                            [formControl]="rule.controls.value"
+                            placeholder="輸入值"
+                            class="value-input">
+
+                          <button
+                            type="button"
+                            class="btn-danger btn-icon"
+                            (click)="removeCondition(type, i, j)">
+                            ✕
+                          </button>
+                        </div>
+                      }
+
+                      <button
+                        type="button"
+                        class="btn-secondary btn-sm"
+                        (click)="addCondition(type, i)">
+                        + 新增條件
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <!-- Add OR Group Button -->
+              <button
+                type="button"
+                class="btn-primary"
+                (click)="addOrGroup(type)">
+                + 新增 OR 群組
+              </button>
+
+              <!-- Actions -->
+              <div class="form-actions">
+                <button
+                  type="button"
+                  class="btn-danger"
+                  (click)="deleteRule(type)">
+                  刪除此規則
+                </button>
+              </div>
+            </div>
+          }
+        } @else {
+          <div class="empty-state">
+            <p>請從左側選擇一個規則類型</p>
           </div>
         }
       </div>
-      <button type="button" (click)="addChild()">＋ Add Condition</button>
 
-      <div class="actions">
-        <button type="button" (click)="save(activeIndex())">💾 Save</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div class="footer">
-  <button (click)="submitAll()">Submit All</button>
-  <button (click)="exit()">Exit</button>
-</div>
-
-<pre>
-  {{ formArray.value | json }}
-</pre>
+      <pre>
+        {{ mainForm.value | json }}
+      </pre>
+    </div>

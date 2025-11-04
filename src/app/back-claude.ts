@@ -1,7 +1,7 @@
 // ============ 型別定義 ============
-import { Component, signal } from '@angular/core';
+import { Component, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormControl, FormGroup, FormArray, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormControl, FormGroup, FormArray, FormRecord } from '@angular/forms';
 
 /** 操作符類型 */
 export type Operator = 'EQ' | '!EQ' | 'CTN' | 'GT' | 'LT';
@@ -60,7 +60,8 @@ export interface RootRuleForm {
   selector: 'app-root',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
-  template: `  <div class="rule-manager">
+  template: `
+    <div class="rule-manager">
       <!-- 左側: Type List -->
       <div class="sidebar">
         <h3>Rule Types</h3>
@@ -74,9 +75,6 @@ export interface RootRuleForm {
                   <span class="dirty-indicator"></span>
                 }
                 {{ type }}
-                @if (hasValidationError(type)) {
-                  <span class="error-indicator"></span>
-                }
               </span>
               @if (hasRules(type)) {
                 <span class="badge">{{ getRuleCount(type) }}</span>
@@ -89,20 +87,15 @@ export interface RootRuleForm {
         <div class="sidebar-actions">
           <button
             class="btn-success btn-block"
-            [disabled]="!isFormDirty() || readonly()"
+            [disabled]="!isFormDirty()"
             (click)="saveAllRules()">
             💾 儲存全部
           </button>
           <button
             class="btn-secondary btn-block"
-            [disabled]="!isFormDirty() || readonly()"
+            [disabled]="!isFormDirty()"
             (click)="resetAllRules()">
             ↺ 重置全部
-          </button>
-          <button
-            class="btn-primary btn-block"
-            (click)="toggleReadonly()">
-            {{ readonly() ? '解除唯讀' : '設定唯讀' }}
           </button>
         </div>
       </div>
@@ -110,12 +103,26 @@ export interface RootRuleForm {
       <!-- 右側: Form -->
       <div class="content">
         @if (selectedType(); as type) {
+          <div class="form-header">
+            <h2>
+              {{ type }}
+              @if (isTypeDirty(type)) {
+                <span class="dirty-badge">已修改</span>
+              }
+            </h2>
+            @if (!hasRules(type)) {
+              <button class="btn-primary" (click)="createNewRule(type)">
+                + 新增第一筆規則
+              </button>
+            }
+          </div>
+
           @if (mainForm.controls[type]; as typeForm) {
             <div class="rule-form">
               <!-- Root Level Controls -->
               <div class="root-controls">
                 <label>
-                  <input type="checkbox" [formControl]="typeForm.controls.enabled" [disabled]="readonly()">
+                  <input type="checkbox" [formControl]="typeForm.controls.enabled">
                   啟用規則
                 </label>
                 <span class="operator-badge">{{ typeForm.controls.operator.value }}</span>
@@ -128,7 +135,7 @@ export interface RootRuleForm {
                     <div class="group-header">
                       <div class="group-controls">
                         <label>
-                          <input type="checkbox" [formControl]="orGroup.controls.enabled" [disabled]="readonly()">
+                          <input type="checkbox" [formControl]="orGroup.controls.enabled">
                           啟用群組 #{{ i + 1 }}
                         </label>
                         <span class="operator-badge or">OR</span>
@@ -136,8 +143,7 @@ export interface RootRuleForm {
                       <button
                         type="button"
                         class="btn-danger btn-sm"
-                        (click)="removeOrGroup(type, i)"
-                        [disabled]="readonly()">
+                        (click)="removeOrGroup(type, i)">
                         刪除群組
                       </button>
                     </div>
@@ -147,10 +153,10 @@ export interface RootRuleForm {
                       @for (rule of getConditions(orGroup); track rule; let j = $index) {
                         <div class="rule-item">
                           <label class="checkbox">
-                            <input type="checkbox" [formControl]="rule.controls.enabled" [disabled]="readonly()">
+                            <input type="checkbox" [formControl]="rule.controls.enabled">
                           </label>
 
-                          <select [formControl]="rule.controls.field" class="field-select" [disabled]="readonly()">
+                          <select [formControl]="rule.controls.field" class="field-select">
                             <option value="">選擇欄位</option>
                             <option value="assigen">Assigen</option>
                             <option value="comment">Comment</option>
@@ -159,7 +165,7 @@ export interface RootRuleForm {
                             <option value="priority">Priority</option>
                           </select>
 
-                          <select [formControl]="rule.controls.operator" class="operator-select" [disabled]="readonly()">
+                          <select [formControl]="rule.controls.operator" class="operator-select">
                             <option value="EQ">等於 (=)</option>
                             <option value="!EQ">不等於 (≠)</option>
                             <option value="CTN">包含</option>
@@ -171,14 +177,12 @@ export interface RootRuleForm {
                             type="text"
                             [formControl]="rule.controls.value"
                             placeholder="輸入值"
-                            class="value-input"
-                            [disabled]="readonly()">
+                            class="value-input">
 
                           <button
                             type="button"
                             class="btn-danger btn-icon"
-                            (click)="removeCondition(type, i, j)"
-                            [disabled]="readonly()">
+                            (click)="removeCondition(type, i, j)">
                             ✕
                           </button>
                         </div>
@@ -187,8 +191,7 @@ export interface RootRuleForm {
                       <button
                         type="button"
                         class="btn-secondary btn-sm"
-                        (click)="addCondition(type, i)"
-                        [disabled]="readonly()">
+                        (click)="addCondition(type, i)">
                         + 新增條件
                       </button>
                     </div>
@@ -200,8 +203,7 @@ export interface RootRuleForm {
               <button
                 type="button"
                 class="btn-primary"
-                (click)="addOrGroup(type)"
-                [disabled]="readonly()">
+                (click)="addOrGroup(type)">
                 + 新增 OR 群組
               </button>
 
@@ -210,8 +212,7 @@ export interface RootRuleForm {
                 <button
                   type="button"
                   class="btn-danger"
-                  (click)="deleteRule(type)"
-                  [disabled]="readonly()">
+                  (click)="deleteRule(type)">
                   刪除此規則
                 </button>
               </div>
@@ -223,9 +224,13 @@ export interface RootRuleForm {
           </div>
         }
       </div>
-    </div>`,
-    styles: [`
 
+      <pre>
+        {{ mainForm.value | json }}
+      </pre>
+    </div>
+  `,
+  styles: [`
     .rule-manager {
       display: flex;
       height: 100vh;
@@ -524,16 +529,6 @@ export interface RootRuleForm {
       cursor: pointer;
       font-size: 14px;
     }
-
-    .error-indicator {
-      width: 8px;
-      height: 8px;
-      background: red;
-      border-radius: 50%;
-      display: inline-block;
-      margin-left: 6px;
-      animation: pulse 1.5s infinite;
-    }
   `]
 })
 export class AppComponent {
@@ -547,24 +542,19 @@ export class AppComponent {
   ]);
 
   selectedType = signal<string | null>(null);
-  readonly = signal(false); // <- 新增 readonly 控制整個 form & button
 
+  // 單一主 Form - 包含所有 type 的規則
   mainForm!: FormGroup<Record<string, FormGroup<RootRuleForm>>>;
+  // mainForm!: FormGroup<Record<string, FormGroup<RootRuleForm>>>;
+
+  // 原始資料 - 用於比對是否有變更
   originalData = signal<UserConfig>({});
 
   constructor() {
     this.initializeForm();
   }
 
-  toggleReadonly() {
-    this.readonly.update(v => !v);
-    if (this.readonly()) {
-      this.mainForm.disable({ emitEvent: false });
-    } else {
-      this.mainForm.enable({ emitEvent: false });
-    }
-  }
-
+  // 初始化 Form
   initializeForm() {
     const sampleData: UserConfig = {
       TYPE_A_RULE: {
@@ -605,9 +595,12 @@ export class AppComponent {
       }
     };
 
+    // 儲存原始資料
     this.originalData.set(JSON.parse(JSON.stringify(sampleData)));
 
+    // 建立 FormGroup
     const controls: Record<string, FormGroup<RootRuleForm>> = {};
+
     this.typeList().forEach(type => {
       if (sampleData[type]) {
         controls[type] = this.createRootRuleForm(sampleData[type]);
@@ -617,35 +610,67 @@ export class AppComponent {
     this.mainForm = new FormGroup(controls);
   }
 
-  selectType(type: string) { this.selectedType.set(type); }
+  // 選擇類型
+  selectType(type: string) {
+    this.selectedType.set(type);
+  }
 
-  hasRules(type: string): boolean { return !!this.mainForm.controls[type]; }
+  // 檢查是否有規則
+  hasRules(type: string): boolean {
+    return !!this.mainForm.controls[type];
+  }
+
+  // 取得規則數量
   getRuleCount(type: string): number {
     const form = this.mainForm.controls[type];
     if (!form) return 0;
     return form.controls.children.length;
   }
 
+  // 檢查特定 type 是否有變更 (Deep Compare)
   isTypeDirty(type: string): boolean {
     const currentForm = this.mainForm.controls[type];
     const originalRule = this.originalData()[type];
+
+    // 如果原本沒有，現在有 = dirty
     if (!originalRule && currentForm) return true;
+
+    // 如果原本有，現在沒有 = dirty
     if (originalRule && !currentForm) return true;
+
+    // 都沒有 = not dirty
     if (!originalRule && !currentForm) return false;
-    return JSON.stringify(originalRule) !== JSON.stringify(currentForm!.getRawValue());
+
+    // 深度比對
+    const currentValue = currentForm!.getRawValue();
+    return JSON.stringify(originalRule) !== JSON.stringify(currentValue);
   }
 
-  isFormDirty(): boolean { return this.typeList().some(type => this.isTypeDirty(type)); }
+  // 檢查整個 form 是否有變更
+  isFormDirty(): boolean {
+    return this.typeList().some(type => this.isTypeDirty(type));
+  }
 
+  // 建立新規則
   createNewRule(type: string) {
     const newRule: RootRule = {
       enabled: true,
       operator: 'AND',
-      children: [{ enabled: true, operator: 'OR', children: [{ field: '', operator: 'EQ', value: '', enabled: true }] }]
+      children: [
+        {
+          enabled: true,
+          operator: 'OR',
+          children: [
+            { field: '', operator: 'EQ', value: '', enabled: true }
+          ]
+        }
+      ]
     };
+
     this.mainForm.addControl(type, this.createRootRuleForm(newRule));
   }
 
+  // 建立 RootRuleForm
   createRootRuleForm(data?: RootRule): FormGroup<RootRuleForm> {
     return new FormGroup<RootRuleForm>({
       enabled: new FormControl(data?.enabled ?? true, { nonNullable: true }),
@@ -656,6 +681,7 @@ export class AppComponent {
     });
   }
 
+  // 建立 OrGroupForm
   createOrGroupForm(data?: OrGroup): FormGroup<OrGroupForm> {
     return new FormGroup<OrGroupForm>({
       enabled: new FormControl(data?.enabled ?? true, { nonNullable: true }),
@@ -666,103 +692,119 @@ export class AppComponent {
     });
   }
 
+  // 建立 ConditionForm
   createConditionForm(data?: ConditionRule): FormGroup<ConditionRuleForm> {
     return new FormGroup<ConditionRuleForm>({
-      field: new FormControl(data?.field || '', { nonNullable: true, validators: [Validators.required] }),
-      operator: new FormControl(data?.operator || 'EQ', { nonNullable: true, validators: [Validators.required] }),
-      value: new FormControl(data?.value || '', { nonNullable: true, validators: [Validators.required] }),
-      enabled: new FormControl(typeof data?.enabled === 'string' ? data.enabled === 'true' : data?.enabled ?? true, { nonNullable: true })
+      field: new FormControl(data?.field || '', { nonNullable: true }),
+      operator: new FormControl(data?.operator || 'EQ', { nonNullable: true }),
+      value: new FormControl(data?.value || '', { nonNullable: true }),
+      enabled: new FormControl(
+        typeof data?.enabled === 'string' ? data.enabled === 'true' : data?.enabled ?? true,
+        { nonNullable: true }
+      )
     });
   }
 
+  // 取得 OR Groups
   getOrGroups(form: FormGroup<RootRuleForm>): FormGroup<OrGroupForm>[] {
     return form.controls.children.controls as FormGroup<OrGroupForm>[];
   }
 
+  // 取得 Conditions
   getConditions(orGroup: FormGroup<OrGroupForm>): FormGroup<ConditionRuleForm>[] {
     return orGroup.controls.children.controls as FormGroup<ConditionRuleForm>[];
   }
 
+  // 新增 OR Group
   addOrGroup(type: string) {
     const form = this.mainForm.controls[type];
     if (!form) return;
-    form.controls.children.push(this.createOrGroupForm({ enabled: true, operator: 'OR', children: [{ field: '', operator: 'EQ', value: '', enabled: true }] }));
+
+    form.controls.children.push(this.createOrGroupForm({
+      enabled: true,
+      operator: 'OR',
+      children: [{ field: '', operator: 'EQ', value: '', enabled: true }]
+    }));
   }
 
+  // 移除 OR Group
   removeOrGroup(type: string, index: number) {
     const form = this.mainForm.controls[type];
     if (!form) return;
     form.controls.children.removeAt(index);
   }
 
+  // 新增條件
   addCondition(type: string, groupIndex: number) {
     const form = this.mainForm.controls[type];
     if (!form) return;
+
     const orGroup = form.controls.children.at(groupIndex) as FormGroup<OrGroupForm>;
     orGroup.controls.children.push(this.createConditionForm());
   }
 
+  // 移除條件
   removeCondition(type: string, groupIndex: number, conditionIndex: number) {
     const form = this.mainForm.controls[type];
     if (!form) return;
+
     const orGroup = form.controls.children.at(groupIndex) as FormGroup<OrGroupForm>;
     orGroup.controls.children.removeAt(conditionIndex);
   }
 
+  // 刪除規則
   deleteRule(type: string) {
     if (confirm(`確定要刪除 ${type} 嗎?`)) {
-      (this.mainForm as FormGroup).removeControl(type);
+      // this.mainForm.removeControl(type);
+        (this.mainForm as FormGroup).removeControl(type);
+
     }
   }
 
-saveAllRules() {
-  if (!this.isFormDirty()) {
-    alert('沒有變更需要儲存');
-    return;
+  // 儲存全部規則
+  saveAllRules() {
+    if (!this.isFormDirty()) {
+      alert('沒有變更需要儲存');
+      return;
+    }
+
+    const allData: UserConfig = {};
+
+    this.typeList().forEach(type => {
+      const form = this.mainForm.controls[type];
+      if (form) {
+        allData[type] = form.getRawValue();
+      }
+    });
+
+    console.log('Saving all rules:', allData);
+
+    // 更新原始資料
+    this.originalData.set(JSON.parse(JSON.stringify(allData)));
+
+    alert('✅ 所有規則已儲存!');
   }
 
-  // 檢查是否有任何驗證錯誤
-  const typesWithError = this.typeList().filter(type => this.hasValidationError(type));
-  if (typesWithError.length > 0) {
-    alert(`以下規則尚有錯誤，請先修正：\n- ${typesWithError.join('\n- ')}`);
-    return; // 阻止儲存
-  }
-
-  // 儲存資料
-  const allData: UserConfig = {};
-  this.typeList().forEach(type => {
-    const form = this.mainForm.controls[type];
-    if (form) allData[type] = form.getRawValue();
-  });
-  console.log('Saving all rules:', allData);
-  this.originalData.set(JSON.parse(JSON.stringify(allData)));
-  alert('✅ 所有規則已儲存!');
-}
-
+  // 重置全部規則
   resetAllRules() {
-    if (!this.isFormDirty()) { alert('沒有變更需要重置'); return; }
+    if (!this.isFormDirty()) {
+      alert('沒有變更需要重置');
+      return;
+    }
+
     if (confirm('確定要重置所有變更嗎？')) {
+      // 重建 form
       const original = this.originalData();
       const controls: Record<string, FormGroup<RootRuleForm>> = {};
+
       this.typeList().forEach(type => {
-        if (original[type]) controls[type] = this.createRootRuleForm(original[type]);
+        if (original[type]) {
+          controls[type] = this.createRootRuleForm(original[type]);
+        }
       });
+
       this.mainForm = new FormGroup(controls);
       alert('✅ 已重置所有變更');
     }
-  }
-
-  // ========= 新增驗證錯誤檢查 =========
-  hasValidationError(type: string): boolean {
-    const form = this.mainForm.controls[type];
-    if (!form) return false;
-    const orGroups = this.getOrGroups(form);
-    for (const group of orGroups) {
-      const rules = this.getConditions(group);
-      for (const rule of rules) {
-        if (rule.invalid) return true;
-      }
-    }
-    return false;
   }
 }
