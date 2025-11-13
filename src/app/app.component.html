@@ -1,168 +1,73 @@
-<div class="rule-manager">
-      <!-- 左側: Type List -->
-      <div class="sidebar">
-        <h3>Rule Types</h3>
-        <ul class="type-list">
-          @for (type of typeList(); track type) {
-            <li
-              [class.active]="selectedType() === type"
-              (click)="selectType(type)">
-              <span class="type-name">
-                @if (isTypeDirty(type)) {
-                  <span class="dirty-indicator"></span>
-                }
-                {{ type }}
-              </span>
-              @if (hasRules(type)) {
-                <span class="badge">{{ getRuleCount(type) }}</span>
-              }
-            </li>
-          }
-        </ul>
+<div class="container">
+  <h1>Section & Case Type Selector</h1>
 
-        <!-- 全域操作按鈕 -->
-        <div class="sidebar-actions">
-          <button
-            class="btn-success btn-block"
-            [disabled]="!isFormDirty()"
-            (click)="saveAllRules()">
-            💾 儲存全部
-          </button>
-          <button
-            class="btn-secondary btn-block"
-            [disabled]="!isFormDirty()"
-            (click)="resetAllRules()">
-            ↺ 重置全部
-          </button>
-        </div>
+  <div class="selectors">
+    <div class="form-group">
+      <label for="section">Section:</label>
+      <select
+        id="section"
+        [value]="section() || ''"
+        (change)="onSectionChange($event)"
+        class="form-control">
+        <option value="">-- Select Section --</option>
+        @for (sec of sections; track sec) {
+          <option [value]="sec">{{ sec }}</option>
+        }
+      </select>
+    </div>
+
+    @if (section()) {
+      <div class="form-group">
+        <label for="caseType">Case Type:</label>
+        <select
+          id="caseType"
+          [value]="caseType() || ''"
+          (change)="onCaseTypeChange($event)"
+          class="form-control">
+          <option value="">-- Select Case Type --</option>
+          @for (type of caseTypes; track type) {
+            <option [value]="type">{{ type }}</option>
+          }
+        </select>
       </div>
+    }
+  </div>
 
-      <!-- 右側: Form -->
-      <div class="content">
-        @if (selectedType(); as type) {
-          <div class="form-header">
-            <h2>
-              {{ type }}
-              @if (isTypeDirty(type)) {
-                <span class="dirty-badge">已修改</span>
-              }
-            </h2>
-            @if (!hasRules(type)) {
-              <button class="btn-primary" (click)="createNewRule(type)">
-                + 新增第一筆規則
-              </button>
-            }
-          </div>
+  <div class="status">
+    @if (loading()) {
+      <p class="loading">Loading...</p>
+    }
+    @if (!loading() && section() && caseType() && fields().length > 0) {
+      <p class="info">
+        ✓ Loaded from {{ cache()[section()! + '_' + caseType()!] ? 'cache' : 'API' }}
+      </p>
+    }
+  </div>
 
-          @if (mainForm.controls[type]; as typeForm) {
-            <div class="rule-form">
-              <!-- Root Level Controls -->
-              <div class="root-controls">
-                <label>
-                  <input type="checkbox" [formControl]="typeForm.controls.enabled">
-                  啟用規則
-                </label>
-                <span class="operator-badge">{{ typeForm.controls.operator.value }}</span>
-              </div>
+  @if (fields().length > 0) {
+    <div class="results">
+      <h2>Fields:</h2>
+      <ul>
+        @for (field of fields(); track field) {
+          <li>{{ field }}</li>
+        }
+      </ul>
+    </div>
+  }
 
-              <!-- AND Groups (FormArray) -->
-              <div class="and-groups">
-                @for (orGroup of getOrGroups(typeForm); track orGroup; let i = $index) {
-                  <div class="or-group-wrapper">
-                    <div class="group-header">
-                      <div class="group-controls">
-                        <label>
-                          <input type="checkbox" [formControl]="orGroup.controls.enabled">
-                          啟用群組 #{{ i + 1 }}
-                        </label>
-                        <span class="operator-badge or">OR</span>
-                      </div>
-                      <button
-                        type="button"
-                        class="btn-danger btn-sm"
-                        (click)="removeOrGroup(type, i)">
-                        刪除群組
-                      </button>
-                    </div>
-
-                    <!-- OR Group Rules -->
-                    <div class="rules-list">
-                      @for (rule of getConditions(orGroup); track rule; let j = $index) {
-                        <div class="rule-item">
-                          <label class="checkbox">
-                            <input type="checkbox" [formControl]="rule.controls.enabled">
-                          </label>
-
-                          <select [formControl]="rule.controls.field" class="field-select">
-                            <option value="">選擇欄位</option>
-                            <option value="assigen">Assigen</option>
-                            <option value="comment">Comment</option>
-                            <option value="user">User</option>
-                            <option value="status">Status</option>
-                            <option value="priority">Priority</option>
-                          </select>
-
-                          <select [formControl]="rule.controls.operator" class="operator-select">
-                            <option value="EQ">等於 (=)</option>
-                            <option value="!EQ">不等於 (≠)</option>
-                            <option value="CTN">包含</option>
-                            <option value="GT">大於 (>)</option>
-                            <option value="LT">小於 (<)</option>
-                          </select>
-
-                          <input
-                            type="text"
-                            [formControl]="rule.controls.value"
-                            placeholder="輸入值"
-                            class="value-input">
-
-                          <button
-                            type="button"
-                            class="btn-danger btn-icon"
-                            (click)="removeCondition(type, i, j)">
-                            ✕
-                          </button>
-                        </div>
-                      }
-
-                      <button
-                        type="button"
-                        class="btn-secondary btn-sm"
-                        (click)="addCondition(type, i)">
-                        + 新增條件
-                      </button>
-                    </div>
-                  </div>
-                }
-              </div>
-
-              <!-- Add OR Group Button -->
-              <button
-                type="button"
-                class="btn-primary"
-                (click)="addOrGroup(type)">
-                + 新增 OR 群組
-              </button>
-
-              <!-- Actions -->
-              <div class="form-actions">
-                <button
-                  type="button"
-                  class="btn-danger"
-                  (click)="deleteRule(type)">
-                  刪除此規則
-                </button>
-              </div>
-            </div>
-          }
-        } @else {
-          <div class="empty-state">
-            <p>請從左側選擇一個規則類型</p>
-          </div>
+  <div class="cache-info">
+    <h3>Cache Status:</h3>
+    <p>Cached items: {{ Object.keys(cache()).length }}</p>
+    @if (Object.keys(cache()).length > 0) {
+      <button (click)="clearCache()" class="btn-clear">
+        Clear Cache
+      </button>
+      <div class="cached-keys">
+        <strong>Cached keys:</strong>
+        @for (key of Object.keys(cache()); track key) {
+          <span class="cache-key">{{ key }}</span>
         }
       </div>
-
-      <pre>
-        {{ mainForm.value | json }}
-      </pre>
-    </div>
+    }
+  </div>
+</div>
